@@ -120,12 +120,12 @@ OPENAI_MODEL = "gpt-4o"
 2. **Snowflake Connection Failed**: Verify database credentials and permissions
 3. **Model Not Available**: Ensure your OpenAI plan supports the selected model
 
-### Debug Mode
+### Connection Testing
 
-The application includes comprehensive debugging features:
-- Connection testing for both Snowflake and OpenAI
-- Detailed error messages with troubleshooting guidance
-- Step-by-step diagnostic information
+The application includes connection testing features:
+- Test Snowflake database connection
+- Test OpenAI API connection
+- Simple error messages with guidance
 
 ## 📝 License
 

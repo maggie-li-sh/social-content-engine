@@ -1208,25 +1208,9 @@ For Instagram/TikTok:
                             st.markdown("**❌ Content Generation Error:**")
                             st.error(item['visual_text'])
                             
-                            # Show debug information if available
-                            if item.get('debug_info'):
-                                with st.expander("🐛 Debug Information", expanded=False):
-                                    debug_info = item['debug_info']
-                                    st.json(debug_info)
-                                    
-                                    st.markdown("**🔧 Troubleshooting:**")
-                                    if debug_info.get('likely_cause'):
-                                        st.markdown(f"- **Likely Cause**: {debug_info['likely_cause']}")
-                                    
-                                    if 'network' in debug_info.get('likely_cause', '').lower():
-                                        st.markdown("- Contact your Snowflake admin about external API access")
-                                        st.markdown("- Try the Connection Test page to verify API access")
-                                    elif 'api key' in debug_info.get('likely_cause', '').lower():
-                                        st.markdown("- Check Snowflake Secrets: OPENAI_API_KEY")
-                                        st.markdown("- Verify your API key starts with 'sk-proj-'")
-                                    elif 'model' in debug_info.get('likely_cause', '').lower():
-                                        st.markdown("- Try a different model: gpt-4, gpt-3.5-turbo")
-                                        st.markdown("- Check your OpenAI plan for model access")
+                            # Simple guidance for network issues
+                            if 'network' in item['visual_text'].lower() or 'connection' in item['visual_text'].lower():
+                                st.warning("⚠️ **Network Issue**: Contact your Snowflake administrator to whitelist api.openai.com")
                         else:
                             st.markdown("**🎯 Visual Text:**")
                             st.info(item['visual_text'])
@@ -1780,213 +1764,40 @@ For Instagram/TikTok:
             self.test_openai_connection()
     
     def test_openai_connection(self):
-        """Test OpenAI API connection with comprehensive debugging"""
-        st.markdown("#### 🔍 OpenAI Connection Diagnostics")
-        
-        # Debug info container
-        debug_container = st.expander("🐛 Debug Information", expanded=True)
+        """Test OpenAI API connection"""
+        st.markdown("#### 🤖 OpenAI Connection Test")
         
         try:
-            import os
-            from openai import OpenAI
+            from ai_contextualizer import ContentGenerator
             
-            with debug_container:
-                st.markdown("**Step 1: Environment Detection**")
+            with st.spinner("Testing OpenAI connection..."):
+                # Initialize content generator (this will test the connection)
+                generator = ContentGenerator()
                 
-                # Check environment type
-                is_snowflake = 'SNOWFLAKE_WAREHOUSE' in os.environ or hasattr(st, 'secrets')
-                environment = "Snowflake Streamlit" if is_snowflake else "Local Development"
-                st.info(f"🌐 Environment: {environment}")
-                
-                # Check Python version and OpenAI library
-                import sys
-                import openai
-                st.info(f"🐍 Python: {sys.version.split()[0]}")
-                st.info(f"📦 OpenAI Library: {openai.__version__}")
-                
-                st.markdown("**Step 2: API Key Detection**")
-                
-                # Try environment variable first
-                env_key = os.getenv('OPENAI_API_KEY')
-                env_key_found = bool(env_key)
-                st.info(f"🔑 Environment Variable: {'✅ Found' if env_key_found else '❌ Not Found'}")
-                
-                if env_key_found:
-                    st.info(f"🔍 Key Length: {len(env_key)} characters")
-                    st.info(f"🔍 Key Prefix: {env_key[:20]}...")
-                
-                # Try Streamlit secrets
-                secrets_key = None
-                secrets_key_found = False
-                if hasattr(st, 'secrets'):
-                    try:
-                        secrets_key = st.secrets.get('OPENAI_API_KEY')
-                        secrets_key_found = bool(secrets_key)
-                        st.info(f"🔐 Streamlit Secrets: {'✅ Found' if secrets_key_found else '❌ Not Found'}")
-                        
-                        if secrets_key_found:
-                            st.info(f"🔍 Secrets Key Length: {len(secrets_key)} characters")
-                            st.info(f"🔍 Secrets Key Prefix: {secrets_key[:20]}...")
-                            
-                        # Show all available secrets (without values)
-                        if hasattr(st.secrets, '_secrets'):
-                            available_secrets = list(st.secrets._secrets.keys()) if st.secrets._secrets else []
-                            st.info(f"🗝️ Available Secrets: {available_secrets}")
-                        
-                    except Exception as e:
-                        st.warning(f"⚠️ Error accessing secrets: {str(e)}")
-                else:
-                    st.warning("⚠️ Streamlit secrets not available")
-                
-                # Try direct file reading as fallback
-                st.markdown("**Step 2b: Direct File Access (Fallback)**")
-                file_key = None
-                for secrets_path in ['/.streamlit/secrets.toml', '/home/udf/.streamlit/secrets.toml']:
-                    try:
-                        if os.path.exists(secrets_path):
-                            st.info(f"📁 Found secrets file: {secrets_path}")
-                            with open(secrets_path, 'r') as f:
-                                content = f.read()
-                                st.info(f"📄 File content length: {len(content)} characters")
-                                # Extract API key
-                                import re
-                                match = re.search(r'OPENAI_API_KEY\s*=\s*["\']([^"\']+)["\']', content)
-                                if match:
-                                    file_key = match.group(1)
-                                    st.info(f"🔑 Found API key in file: {file_key[:20]}...")
-                                    break
-                                else:
-                                    st.warning("⚠️ No API key pattern found in file")
-                        else:
-                            st.info(f"❌ File not found: {secrets_path}")
-                    except Exception as e:
-                        st.warning(f"⚠️ Error reading {secrets_path}: {str(e)}")
-                
-                # Determine which key to use
-                api_key = env_key or secrets_key or file_key
-                key_source = "Environment Variable" if env_key else "Streamlit Secrets" if secrets_key else "Direct File" if file_key else "None"
-                st.info(f"🎯 Using Key From: {key_source}")
-                
-            if not api_key:
-                st.error("❌ No API key found in environment variables or Streamlit secrets")
-                with debug_container:
-                    st.markdown("**🔧 Troubleshooting Steps:**")
-                    st.markdown("1. In Snowflake, go to your Streamlit app settings")
-                    st.markdown("2. Add a secret: `OPENAI_API_KEY = 'your-api-key-here'`")
-                    st.markdown("3. Make sure the key starts with `sk-proj-`")
-                    st.markdown("4. Redeploy your app")
-                return
-            
-            with debug_container:
-                st.markdown("**Step 3: Model Configuration**")
-                
-                # Get model from environment or secrets
-                env_model = os.getenv('OPENAI_MODEL')
-                secrets_model = None
-                if hasattr(st, 'secrets'):
-                    try:
-                        secrets_model = st.secrets.get('OPENAI_MODEL')
-                    except Exception as e:
-                        st.info(f"⚠️ Could not access secrets for model: {str(e)}")
-                
-                model = env_model or secrets_model or 'gpt-4o'
-                model_source = "Environment" if env_model else "Secrets" if secrets_model else "Default"
-                
-                st.info(f"🤖 Model: {model}")
-                st.info(f"🎯 Model Source: {model_source}")
-                
-                st.markdown("**Step 4: API Connection Test**")
-            
-            with st.spinner("Testing OpenAI API connection..."):
-                # Initialize client
-                with debug_container:
-                    st.info("🔌 Initializing OpenAI client...")
-                
-                client = OpenAI(api_key=api_key)
-                
-                with debug_container:
-                    st.info("✅ Client initialized successfully")
-                    st.info(f"📡 Making API call to model: {model}")
-                
-                # Test the connection
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": "Say 'connection test successful'"}],
-                    max_tokens=10,
-                    timeout=30  # Add timeout
+                # Test with a simple call
+                test_response = generator.client.chat.completions.create(
+                    model=generator.model,
+                    messages=[{"role": "user", "content": "Say 'test successful'"}],
+                    max_tokens=10
                 )
                 
-                result = response.choices[0].message.content.strip()
-                
-                with debug_container:
-                    st.info("✅ API call successful")
-                    st.info(f"📝 Response ID: {response.id}")
-                    st.info(f"📊 Usage: {response.usage}")
-                
-                st.success(f"✅ OpenAI: Connected successfully with {model}")
+                result = test_response.choices[0].message.content.strip()
+                st.success(f"✅ OpenAI: Connected successfully")
                 st.info(f"💬 Test response: {result}")
-                
-        except ImportError as e:
-            st.error(f"❌ Import Error: {str(e)}")
-            with debug_container:
-                st.markdown("**🔧 Fix:** Add `openai` to your requirements.txt file")
                 
         except Exception as e:
             error_msg = str(e)
             st.error(f"❌ OpenAI Connection Failed: {error_msg}")
             
-            with debug_container:
-                st.markdown("**Step 5: Error Analysis**")
-                st.code(error_msg)
-                
-                # Detailed error analysis
-                if "rate_limit" in error_msg.lower():
-                    st.markdown("**🔧 Rate Limit Error:**")
-                    st.markdown("- You've exceeded your API quota")
-                    st.markdown("- Wait a few minutes and try again")
-                    st.markdown("- Check your OpenAI dashboard for usage")
-                    
-                elif "invalid_api_key" in error_msg.lower() or "unauthorized" in error_msg.lower():
-                    st.markdown("**🔧 API Key Error:**")
-                    st.markdown("- Your API key is invalid or expired")
-                    st.markdown("- Generate a new key from OpenAI dashboard")
-                    st.markdown("- Make sure it starts with `sk-proj-`")
-                    
-                elif "model" in error_msg.lower() and ("does not exist" in error_msg.lower() or "not found" in error_msg.lower()):
-                    st.markdown(f"**🔧 Model Error:**")
-                    st.markdown(f"- Model `{model}` is not available")
-                    st.markdown("- Try `gpt-4`, `gpt-3.5-turbo`, or `gpt-4o-mini`")
-                    st.markdown("- Check your OpenAI plan for model access")
-                    
-                elif "connection" in error_msg.lower() or "network" in error_msg.lower():
-                    st.markdown("**🔧 Network Error:**")
-                    st.markdown("- Snowflake might be blocking external API calls")
-                    st.markdown("- Contact your Snowflake administrator")
-                    st.markdown("- Check if OpenAI API is whitelisted")
-                    
-                elif "timeout" in error_msg.lower():
-                    st.markdown("**🔧 Timeout Error:**")
-                    st.markdown("- The API call took too long")
-                    st.markdown("- This might indicate network restrictions")
-                    st.markdown("- Try again or contact support")
-                    
-                elif "billing" in error_msg.lower() or "quota" in error_msg.lower():
-                    st.markdown("**🔧 Billing Error:**")
-                    st.markdown("- Your OpenAI account may need billing setup")
-                    st.markdown("- Check your OpenAI dashboard for billing status")
-                    st.markdown("- Add payment method if required")
-                    
-                else:
-                    st.markdown("**🔧 Unknown Error:**")
-                    st.markdown("- This is an unexpected error")
-                    st.markdown("- Copy the error message above")
-                    st.markdown("- Check OpenAI status page")
-                    st.markdown("- Try with a different model")
-                
-                # Show full traceback for debugging
-                import traceback
-                st.markdown("**🔍 Full Traceback:**")
-                st.code(traceback.format_exc())
+            # Simple error guidance
+            if "connection" in error_msg.lower() or "network" in error_msg.lower():
+                st.warning("⚠️ **Network Issue**: Snowflake may be blocking external API calls. Contact your administrator to whitelist api.openai.com")
+            elif "invalid_api_key" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                st.warning("⚠️ **API Key Issue**: Check your OpenAI API key configuration")
+            elif "model" in error_msg.lower() and "does not exist" in error_msg.lower():
+                st.warning("⚠️ **Model Issue**: The specified model may not be available on your OpenAI plan")
+            else:
+                st.warning("⚠️ **Unknown Issue**: Please check your OpenAI API configuration")
     
     def render_data_preview(self):
         """Render data preview page with comprehensive loading section"""

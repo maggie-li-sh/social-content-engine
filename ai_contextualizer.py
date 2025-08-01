@@ -41,13 +41,13 @@ class ContentGenerator:
         }
     
     def _get_api_key(self):
-        """Get OpenAI API key from environment or Snowflake secrets"""
+        """Get OpenAI API key from environment or Streamlit secrets"""
         # Try environment variable first (local development)
         api_key = os.getenv('OPENAI_API_KEY')
         if api_key:
             return api_key
         
-        # Try Snowflake secrets
+        # Try Streamlit secrets (Snowflake deployment)
         try:
             import streamlit as st
             if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
@@ -55,74 +55,22 @@ class ContentGenerator:
         except:
             pass
         
-        # Try reading secrets.toml directly from known Snowflake paths
-        for secrets_path in ['/.streamlit/secrets.toml', '/home/udf/.streamlit/secrets.toml', 'secrets.toml']:
-            try:
-                if os.path.exists(secrets_path):
-                    import toml
-                    secrets = toml.load(secrets_path)
-                    api_key = secrets.get('OPENAI_API_KEY')
-                    if api_key:
-                        return api_key
-            except Exception:
-                continue
-        
-        # Fallback: try reading as plain text file
-        for secrets_path in ['/.streamlit/secrets.toml', '/home/udf/.streamlit/secrets.toml']:
-            try:
-                if os.path.exists(secrets_path):
-                    with open(secrets_path, 'r') as f:
-                        content = f.read()
-                        # Simple regex to extract API key
-                        import re
-                        match = re.search(r'OPENAI_API_KEY\s*=\s*["\']([^"\']+)["\']', content)
-                        if match:
-                            return match.group(1)
-            except Exception:
-                continue
-        
         return None
     
     def _get_model(self):
-        """Get OpenAI model from environment or Snowflake secrets"""
+        """Get OpenAI model from environment or Streamlit secrets"""
         # Try environment variable first
         model = os.getenv('OPENAI_MODEL')
         if model:
             return model
         
-        # Try Snowflake secrets
+        # Try Streamlit secrets (Snowflake deployment)
         try:
             import streamlit as st
             if hasattr(st, 'secrets') and 'OPENAI_MODEL' in st.secrets:
                 return st.secrets['OPENAI_MODEL']
         except:
             pass
-        
-        # Try reading secrets.toml directly from known Snowflake paths
-        for secrets_path in ['/.streamlit/secrets.toml', '/home/udf/.streamlit/secrets.toml', 'secrets.toml']:
-            try:
-                if os.path.exists(secrets_path):
-                    import toml
-                    secrets = toml.load(secrets_path)
-                    model = secrets.get('OPENAI_MODEL')
-                    if model:
-                        return model
-            except Exception:
-                continue
-        
-        # Fallback: try reading as plain text file
-        for secrets_path in ['/.streamlit/secrets.toml', '/home/udf/.streamlit/secrets.toml']:
-            try:
-                if os.path.exists(secrets_path):
-                    with open(secrets_path, 'r') as f:
-                        content = f.read()
-                        # Simple regex to extract model
-                        import re
-                        match = re.search(r'OPENAI_MODEL\s*=\s*["\']([^"\']+)["\']', content)
-                        if match:
-                            return match.group(1)
-            except Exception:
-                continue
         
         # Default to gpt-4o
         return 'gpt-4o'
@@ -160,44 +108,23 @@ class ContentGenerator:
         except Exception as e:
             error_msg = str(e)
             
-            # Enhanced debugging information
-            debug_info = {
-                'original_error': error_msg,
-                'model_used': self.model,
-                'platform': platform,
-                'content_angle': content_angle,
-                'event_artist': event_data.get('classified_artist_name', 'Unknown')
-            }
-            
-            # Provide more specific error messages
-            if "rate_limit" in error_msg.lower():
-                user_msg = "Rate limit exceeded. Please wait a moment and try again."
-                debug_info['likely_cause'] = "API rate limit hit - too many requests"
+            # Simple error message based on error type
+            if "connection" in error_msg.lower() or "network" in error_msg.lower():
+                user_msg = "Network connection error. Contact your Snowflake administrator to whitelist api.openai.com"
             elif "invalid_api_key" in error_msg.lower() or "unauthorized" in error_msg.lower():
-                user_msg = "Invalid API key. Please check your OpenAI API key in Snowflake secrets."
-                debug_info['likely_cause'] = "API key not set properly in Snowflake"
+                user_msg = "Invalid API key. Please check your OpenAI API key configuration."
             elif "model" in error_msg.lower() and "does not exist" in error_msg.lower():
-                user_msg = f"Model '{self.model}' not available. Check your OpenAI plan or use a different model."
-                debug_info['likely_cause'] = f"Model {self.model} not accessible with your API key"
-            elif "connection" in error_msg.lower() or "network" in error_msg.lower():
-                user_msg = "Network connection error. Snowflake may be blocking external API calls."
-                debug_info['likely_cause'] = "Network restrictions in Snowflake environment"
-            elif "timeout" in error_msg.lower():
-                user_msg = "Request timeout. This may indicate network restrictions."
-                debug_info['likely_cause'] = "API call timed out - possible network restrictions"
-            elif "billing" in error_msg.lower() or "quota" in error_msg.lower():
-                user_msg = "Billing or quota issue. Check your OpenAI account status."
-                debug_info['likely_cause'] = "OpenAI account billing or usage limits"
+                user_msg = f"Model '{self.model}' not available. Check your OpenAI plan."
+            elif "rate_limit" in error_msg.lower():
+                user_msg = "Rate limit exceeded. Please wait and try again."
             else:
-                user_msg = f"OpenAI API error: {error_msg}"
-                debug_info['likely_cause'] = "Unknown error - check OpenAI status"
+                user_msg = f"API error: {error_msg}"
             
             return {
                 'visual_text': f"❌ {user_msg}",
                 'caption': f"❌ {user_msg}",
                 'platform': platform,
-                'error': True,
-                'debug_info': debug_info
+                'error': True
             }
     
     def _parse_dual_content(self, content: str, platform: str) -> Dict:

@@ -46,8 +46,12 @@ python-dotenv
 
 ### 4. **Common Issues & Solutions**
 
-#### ❌ "Connection Error" when generating content
-**Cause:** OpenAI API key not accessible
+#### ❌ "Network connection error" when generating content
+**Cause:** Snowflake environment blocking external API calls to OpenAI
+**Solution:** Contact your Snowflake administrator to whitelist `api.openai.com`
+
+#### ❌ "Invalid API key" error
+**Cause:** OpenAI API key not properly configured
 **Solution:** Check that `OPENAI_API_KEY` is set in Snowflake secrets
 
 #### ❌ "Model 'gpt-4o' does not exist"
@@ -56,10 +60,6 @@ python-dotenv
 ```toml
 OPENAI_MODEL = "gpt-4"
 ```
-
-#### ❌ Network/Firewall Issues
-**Cause:** Snowflake environment blocking external API calls
-**Solution:** Contact your Snowflake admin about OpenAI API access
 
 #### ❌ "Module not found" errors
 **Cause:** Missing dependencies
@@ -91,19 +91,13 @@ OPENAI_MODEL = "gpt-4"
 
 ## 🆘 Troubleshooting
 
-### If content generation still fails:
+### If content generation fails:
 
-1. **Check the error message** in the generated content display
-2. **Verify API key** has sufficient credits and permissions
-3. **Try different model** (gpt-4, gpt-3.5-turbo) in secrets
-4. **Test with minimal data** (1 event, 1 content angle)
-5. **Contact support** if network restrictions are suspected
-
-### Debug Steps:
-1. Use "Test Connections" button in sidebar
-2. Check browser console for JavaScript errors
-3. Verify all secrets are properly set
-4. Try regenerating content after clearing cache
+1. **Network Issues**: Most common cause is Snowflake blocking external API calls
+   - Contact your Snowflake administrator to whitelist `api.openai.com`
+2. **API Key Issues**: Verify your OpenAI API key is properly configured in Snowflake secrets
+3. **Model Access**: Try a different model (gpt-4, gpt-3.5-turbo) if GPT-4o is not available
+4. **Test Connections**: Use the "Test Connections" button in the sidebar to verify setup
 
 ## 📞 Support
 
